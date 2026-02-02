@@ -32,27 +32,65 @@ AActividad3Character::AActividad3Character()
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
 	// instead of recompiling to adjust them
-	GetCharacterMovement()->JumpZVelocity = DefaultJumpZVelocity;
+	GetCharacterMovement()->JumpZVelocity = DefaultJumpZVelocity; 
 	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	GetCharacterMovement()->MaxWalkSpeed = DefaultMaxWalkSpeed;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	// ---------- CAMERA TOP DOWN ----------
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
-	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+	CameraBoom->TargetArmLength = 800.0f; // The camera follows at this distance behind the character	
+	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f)); // top down view
+	CameraBoom->bUsePawnControlRotation = false; // Don't rotate the arm based on the controller
+	CameraBoom->bInheritPitch = false;
+	CameraBoom->bInheritRoll = false;
+	CameraBoom->bInheritYaw = false;
 
 	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
-	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
+
+void AActividad3Character::ToggleCameraMode()
+{
+	if (bIsTopDownCamera)
+	{
+		CameraBoom->TargetArmLength = ThirdPersonArmLength;
+		CameraBoom->SetRelativeRotation(ThirdPersonRotation);
+		CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+		CameraBoom->bInheritPitch = true;
+		CameraBoom->bInheritRoll = true;
+		CameraBoom->bInheritYaw = true;
+		bUseCameraRelativeMovement = true;
+
+		// Rotate camera to character
+		FRotator TargetRotation = CameraBoom->GetComponentRotation();
+		TargetRotation.Pitch = 0.f;
+		TargetRotation.Roll = 0.f;
+
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, GetWorld()->GetDeltaSeconds(), 10.f));
+	}
+	else
+	{
+		CameraBoom->TargetArmLength = TopDownArmLength;
+		CameraBoom->SetRelativeRotation(TopDownRotation);
+		CameraBoom->bUsePawnControlRotation = false; // Don't rotate the arm based on the controller
+		CameraBoom->bInheritPitch = false;
+		CameraBoom->bInheritRoll = false;
+		CameraBoom->bInheritYaw = false;
+		bUseCameraRelativeMovement = false;
+	}
+
+	bIsTopDownCamera = !bIsTopDownCamera; 
+}
+
 
 void AActividad3Character::BeginPlay()
 {
@@ -86,6 +124,14 @@ void AActividad3Character::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AActividad3Character::Look);
+
+		// Toogle TopDown
+		EnhancedInputComponent->BindAction(
+			ToggleCameraAction,
+			ETriggerEvent::Triggered,
+			this,
+			&AActividad3Character::ToggleCameraMode
+		);
 	}
 	else
 	{
@@ -95,24 +141,30 @@ void AActividad3Character::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 void AActividad3Character::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
 	if (Controller != nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
+		FVector Forward, Right;
 
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+		if (bUseCameraRelativeMovement)
+		{
+			// Movimiento relativo a la cámara
+			FRotator Rotation = CameraBoom->GetComponentRotation();
+			Rotation.Pitch = 0.f;
+			Rotation.Roll = 0.f;
 
-		// add movement 
-		AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
+			Forward = FRotationMatrix(Rotation).GetUnitAxis(EAxis::X);
+			Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
+		}
+		else
+		{
+			// Movimiento relativo al mundo
+			Forward = FVector::ForwardVector;
+			Right = FVector::RightVector;
+		}
+
+		AddMovementInput(Forward, MovementVector.Y);
+		AddMovementInput(Right, MovementVector.X);
 	}
 }
 

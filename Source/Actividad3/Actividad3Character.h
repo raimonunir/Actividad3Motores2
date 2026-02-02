@@ -44,13 +44,44 @@ class AActividad3Character : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	// JumpZvelocity
 	UPROPERTY(EditDefaultsOnly, Category = "Movement")
-	float DefaultJumpZVelocity = 3700.f;
+	float DefaultJumpZVelocity = 1000.f;
+
+	// MaxWalkSpeed
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float DefaultMaxWalkSpeed = 850.f;
+
+	// TopDown optional ----------
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+	float TopDownArmLength = 800.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+	FRotator TopDownRotation = FRotator(-60.f, 0.f, 0.f);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+	float ThirdPersonArmLength = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Camera")
+	FRotator ThirdPersonRotation = FRotator(-10.f, 0.f, 0.f);
+
+	bool bIsTopDownCamera = true;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* ToggleCameraAction;
+
+
+	//-------------------
 
 
 public:
 	AActividad3Character();
+
+	void ToggleCameraMode();
 	
+	// Determina si el movimiento se interpreta relativo a la cámara o al mundo
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	bool bUseCameraRelativeMovement = false;
 
 protected:
 
